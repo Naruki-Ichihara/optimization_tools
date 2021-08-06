@@ -1,0 +1,2 @@
+FROM ichiharanaruki/scientifictoolset:base
+USER root
