@@ -219,12 +219,13 @@ class CoreProcess(torch_fenics.FEniCSModule):
         files (dict{'str'}): File paths for saving some results.
     
     """
-    def __init__(self, mesh, load_conditions, applied_load_vectors, bcs, material_parameters, files):
+    def __init__(self, mesh, load_conditions, applied_load_vectors, bcs, applied_displacements, material_parameters, files):
         super().__init__()
         self.mesh = mesh
         self.load_conditions = load_conditions
         self.applied_loadvectors = applied_load_vectors
         self.bcs = bcs
+        self.applied_displacements = applied_displacements
         self.material_parameters = material_parameters
         self.files = files
     
@@ -278,14 +279,18 @@ class CoreProcess(torch_fenics.FEniCSModule):
         )
         Q_reduce = Q*density**3
 
-        # test
-        clamp_bc = DirichletBC(V, Constant((0, 0)), Clamp())
+        bcs = []
+        for i in range(len(self.bcs)):
+            bcs.append(DirichletBC(V, self.applied_displacements[i], self.bcs[i]))
 
         a = inner(stress(Q_reduce, v), strain(dv))*dx
-        L = dot(Constant((0, 0)), dv)*ds(0)
-        for i in range(len(self.load_conditions)):
-            L += dot(self.applied_loadvectors[i], dv)*ds(i+1)
-        solve(a==L, vh, clamp_bc)
+        L = dot(self.applied_loadvectors[0], dv)*ds(1)
+        if len(self.applied_loadvectors) > 1:
+            for i in range(len(self.load_conditions)-1):
+                L += dot(self.applied_loadvectors[i+1], dv)*ds(i+2)
+        else:
+            pass
+        solve(a==L, vh, bcs)
         strain_energy = 0.5*inner(stress(Q_reduce, vh), strain(vh))*dx
         cost = assemble(strain_energy)
 
@@ -364,6 +369,7 @@ class Optimizer():
         self.load_conditions = None
         self.applied_loadvectors = None
         self.bcs = None
+        self.applied_displacements = None
         self.material_parameters = None
         self.files = None
         self.target = None
@@ -389,8 +395,9 @@ class Optimizer():
         self.count_vertices = mesh.num_vertices()
         pass
 
-    def set_bcs(self, bcs):
-        self.bcs = bcs
+    def set_bcs(self, boundaries, applied_displacements):
+        self.bcs = boundaries
+        self.applied_displacements = applied_displacements
         pass
 
     def set_loading(self, boundaries, applied_load):
@@ -415,6 +422,7 @@ class Optimizer():
                                    self.load_conditions,
                                    self.applied_loadvectors,
                                    self.bcs,
+                                   self.applied_displacements,
                                    self.material_parameters,
                                    self.files)
         pass
@@ -430,10 +438,7 @@ class Optimizer():
         solver.set_maxeval(100)
         x = solver.optimize(x0)
         pass
-        
-class Clamp(SubDomain):
-    def inside(self, x, on_boundary):
-        return x[1] < -97.65 and on_boundary
+
         
 
     
