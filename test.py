@@ -4,22 +4,25 @@ from fenics_adjoint import *
 import numpy as np
 
 problem = Optimizer()
-mesh = Mesh('/workdir/mesh/implant.xml')
+#mesh = Mesh('/workdir/mesh/implant.xml')
+#N = mesh.num_vertices()
+
+mesh = RectangleMesh(Point(0,0), Point(40, 20), 100, 50)
 N = mesh.num_vertices()
 
 class Clamp(SubDomain):
     def inside(self, x, on_boundary):
-        return x[1] < -97.65 and on_boundary
+        return x[0] < 1e-5 and on_boundary
 
 class Loading(SubDomain):
     def inside(self, x, on_boundary):
-        return x[1] > 16.5 and on_boundary
+        return x[0] > 39.99 and 0. < x[1] < 1. and on_boundary
 
 displacement_boundaries = [Clamp()]
 applied_disp = [Constant((0, 0))]
 
 loading_boundaries = [Loading()]
-applied_loads = [Constant((0, -1))]
+applied_loads = [Constant((0, -10))]
 
 material = {'E1': 3600, 'E2': 600, 'nu12':0.33, 'G12': 300}
 path = 'results/'

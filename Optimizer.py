@@ -260,7 +260,7 @@ class CoreProcess(torch_fenics.FEniCSModule):
         normrized_orient = project(as_vector((cos(theta), sin(theta))), Orient)
         normrized_orient.rename('NormalizedVectorField', 'label')
 
-        offset = 0.5
+        offset = 0.1
         Density = FunctionSpace(self.mesh, 'CG', 1)
         density = heviside_filter(helmholtz_filter(r, Density), Density, offset=offset)
         density.rename('Relatively density field', 'label')
@@ -277,7 +277,7 @@ class CoreProcess(torch_fenics.FEniCSModule):
             self.material_parameters['nu12'],
             theta
         )
-        Q_reduce = Q*density**3
+        Q_reduce = Q*density
 
         bcs = []
         for i in range(len(self.bcs)):
@@ -388,6 +388,10 @@ class Optimizer():
         dcdx = torch.cat((dcdz, dcde, dcdr), 1).squeeze().detach().numpy().copy()
         cost = float(_cost.detach().numpy().copy())
         grad[:] = dcdx
+        f = open('optimization_log.csv', 'a')
+        f.write("{}\n".format(cost))
+        f.close()
+        print(cost)
         return cost
 
     def set_mesh(self, mesh):
@@ -434,7 +438,8 @@ class Optimizer():
         solver.add_inequality_constraint(lambda x, grad: constraint.template(x, grad, self.target), 1e-8)
         solver.set_lower_bounds(-1.0)
         solver.set_upper_bounds(1.0)
-        solver.set_param('verbosity', 1)
+        solver.set_xtol_rel(1e-5)
+        solver.set_param('verbosity', 0)
         solver.set_maxeval(100)
         x = solver.optimize(x0)
         pass
