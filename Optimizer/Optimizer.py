@@ -260,7 +260,7 @@ class CoreProcess(torch_fenics.FEniCSModule):
         normrized_orient = project(as_vector((cos(theta), sin(theta))), Orient)
         normrized_orient.rename('NormalizedVectorField', 'label')
 
-        offset = 0.1
+        offset = 0.5
         Density = FunctionSpace(self.mesh, 'CG', 1)
         density = heviside_filter(helmholtz_filter(r, Density), Density, offset=offset)
         density.rename('Relatively density field', 'label')
@@ -439,8 +439,8 @@ class Optimizer():
         solver.set_lower_bounds(-1.0)
         solver.set_upper_bounds(1.0)
         solver.set_xtol_rel(1e-5)
-        solver.set_param('verbosity', 0)
-        solver.set_maxeval(100)
+        solver.set_param('verbosity', 1)
+        solver.set_maxeval(200)
         x = solver.optimize(x0)
         pass
 
