@@ -78,8 +78,10 @@ def swift_hohenberg():
     solver = KrylovSolver()
 
     mesh = Mesh(comm,'/workdir/mesh/implant.xml')
-    orientation_path = '/workdir/results/orient.xml'
-    '''
+    orientation_path = '/workdir/garally/20210813_implant_80_30/morphogen/orient.xml'
+    density_path = '/workdir/garally/20210813_implant_80_30/morphogen/dens.xml'
+    output_path = '/workdir/garally/20210813_implant_80_30/pattern'
+    ''''
     nx = 100
     ny = 100
     point_start = Point(0., 0.)
@@ -91,9 +93,11 @@ def swift_hohenberg():
     ME = FunctionSpace(mesh, V*V)
     Refine_V = FunctionSpace(refine(mesh), 'CG', 1)
     Orientation_Space = VectorFunctionSpace(mesh, 'CG', 1)
+    Density_space = FunctionSpace(mesh, 'CG', 1)
 
+    density = Function(Density_space, density_path)
     orientation = Function(Orientation_Space, orientation_path)
-    width = 0.8
+    width = 0.8 / density
     frequency = np.pi/width
 
     U = TrialFunction(ME)
@@ -107,15 +111,17 @@ def swift_hohenberg():
     Uh_0.interpolate(U_init)    
 
     elapsed = 0.0
-    total_time = 100
+    total_time = 50
     dt = 0.01
     mobility = 1.0
-    file = XDMFFile("generated_pattern/implant_solid_3/field.xdmf")
-    lyapnov_path = 'generated_pattern/implant_solid_3/lyapnpv.csv'
+    file = XDMFFile(output_path + '/field.xdmf')
+    lyapnov_path = output_path + '/lyapnpv.csv'
     lyapnov_list = []
 
     terms = Terms(5.0, orientation, frequency)
 
+    verbosity = range(0, int(total_time//dt), 10)
+    index = 0
     while (elapsed < total_time):
         qh_mid = 0.5*qh + 0.5*qh_0
         dPhi = terms.G1(uh, uh_0)*uh + terms.G2(uh_0)
@@ -132,9 +138,11 @@ def swift_hohenberg():
              + k**4*uh_solved**2) + terms.Phi(uh_solved) + 0.5*dot(grad(uh_solved), dot(outer(orientation, orientation), grad(uh_solved))))*dx
         lyapnov_list.append(assemble(L))
         Uh_0.vector()[:] = Uh.vector()
-        refine_uh_solved = interpolate(uh_solved, Refine_V)
-        refine_uh_solved.rename('OrderParameter', 'label')
-        file.write(refine_uh_solved, elapsed)
+        if index in list(verbosity):
+            refine_uh_solved = interpolate(uh_solved, Refine_V)
+            refine_uh_solved.rename('OrderParameter', 'label')
+            file.write(refine_uh_solved, elapsed)
+        index += 1
         np.savetxt(lyapnov_path, lyapnov_list, delimiter=',')
     pass
 

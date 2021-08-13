@@ -37,7 +37,7 @@ files = {'Displacement': XDMFFile('{}displacement.xdmf'.format(path)),
 
 z0 = np.zeros(N)
 e0 = np.ones(N)
-r0 = np.ones(N)*0.5
+r0 = np.ones(N)
 x0 = np.concatenate([z0, e0, r0])
 
 problem.set_mesh(mesh)

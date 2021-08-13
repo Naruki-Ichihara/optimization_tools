@@ -260,7 +260,7 @@ class CoreProcess(torch_fenics.FEniCSModule):
         normrized_orient = project(as_vector((cos(theta), sin(theta))), Orient)
         normrized_orient.rename('NormalizedVectorField', 'label')
 
-        offset = 0.5
+        offset = 0.3
         Density = FunctionSpace(self.mesh, 'CG', 1)
         density = heviside_filter(helmholtz_filter(r, Density), Density, offset=offset)
         density.rename('Relatively density field', 'label')
