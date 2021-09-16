@@ -1,8 +1,8 @@
-version: '3'
+version: '3.9'
 services:
-  python3:
+  python:
     restart: always
-    build: .
+    image: ichiharanaruki/scientifictoolset:base
     container_name: 'optimizationtools'
     working_dir: '/root/'
     tty: true

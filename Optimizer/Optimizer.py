@@ -58,7 +58,7 @@ def helmholtz_filter(u, U, r=0.025):
     solve(a==L, vh)
     return project(vh, U)
 
-def heviside_filter(u, U, offset=0.5):
+def heviside_filter(u, U, offset=0.01):
     """# heviside_filter
     
     Apply the heviside function
@@ -219,13 +219,15 @@ class CoreProcess(torch_fenics.FEniCSModule):
         files (dict{'str'}): File paths for saving some results.
     
     """
-    def __init__(self, mesh, load_conditions, applied_load_vectors, bcs, applied_displacements, material_parameters, files):
+    def __init__(self, mesh, load_conditions, applied_load_vectors, displacement_boundaries_sub0, displacement_boundaries_sub1, applied_displacements_sub0, applied_displacements_sub1, material_parameters, files):
         super().__init__()
         self.mesh = mesh
         self.load_conditions = load_conditions
         self.applied_loadvectors = applied_load_vectors
-        self.bcs = bcs
-        self.applied_displacements = applied_displacements
+        self.displacement_boundaries_sub0 = displacement_boundaries_sub0
+        self.applied_displacements_sub0 = applied_displacements_sub0
+        self.displacement_boundaries_sub1 = displacement_boundaries_sub1
+        self.applied_displacements_sub1 = applied_displacements_sub1
         self.material_parameters = material_parameters
         self.files = files
     
@@ -260,7 +262,7 @@ class CoreProcess(torch_fenics.FEniCSModule):
         normrized_orient = project(as_vector((cos(theta), sin(theta))), Orient)
         normrized_orient.rename('NormalizedVectorField', 'label')
 
-        offset = 0.3
+        offset = 0.4
         Density = FunctionSpace(self.mesh, 'CG', 1)
         density = heviside_filter(helmholtz_filter(r, Density), Density, offset=offset)
         density.rename('Relatively density field', 'label')
@@ -280,8 +282,10 @@ class CoreProcess(torch_fenics.FEniCSModule):
         Q_reduce = Q*density
 
         bcs = []
-        for i in range(len(self.bcs)):
-            bcs.append(DirichletBC(V, self.applied_displacements[i], self.bcs[i]))
+        for i in range(len(self.displacement_boundaries_sub0)):
+            bcs.append(DirichletBC(V.sub(0), self.applied_displacements_sub0[i], self.displacement_boundaries_sub0[i]))
+        for i in range(len(self.displacement_boundaries_sub1)):
+            bcs.append(DirichletBC(V.sub(1), self.applied_displacements_sub1[i], self.displacement_boundaries_sub1[i]))
 
         a = inner(stress(Q_reduce, v), strain(dv))*dx
         L = dot(self.applied_loadvectors[0], dv)*ds(1)
@@ -368,8 +372,10 @@ class Optimizer():
         self.mesh = None
         self.load_conditions = None
         self.applied_loadvectors = None
-        self.bcs = None
-        self.applied_displacements = None
+        self.bcs_0 = None
+        self.bcs_1 = None
+        self.applied_displacements_0 = None
+        self.applied_displacements_1 = None
         self.material_parameters = None
         self.files = None
         self.target = None
@@ -399,9 +405,11 @@ class Optimizer():
         self.count_vertices = mesh.num_vertices()
         pass
 
-    def set_bcs(self, boundaries, applied_displacements):
-        self.bcs = boundaries
-        self.applied_displacements = applied_displacements
+    def set_bcs(self, boundaries_sub0, boundaries_sub1, applied_displacements_sub0, applied_displacements_sub1):
+        self.bcs_0 = boundaries_sub0
+        self.bcs_1 = boundaries_sub1
+        self.applied_displacements_0 = applied_displacements_sub0
+        self.applied_displacements_1 = applied_displacements_sub1
         pass
 
     def set_loading(self, boundaries, applied_load):
@@ -425,8 +433,10 @@ class Optimizer():
         self.problem = CoreProcess(self.mesh,
                                    self.load_conditions,
                                    self.applied_loadvectors,
-                                   self.bcs,
-                                   self.applied_displacements,
+                                   self.bcs_0,
+                                   self.bcs_1,
+                                   self.applied_displacements_0,
+                                   self.applied_displacements_1,
                                    self.material_parameters,
                                    self.files)
         pass
@@ -438,9 +448,9 @@ class Optimizer():
         solver.add_inequality_constraint(lambda x, grad: constraint.template(x, grad, self.target), 1e-8)
         solver.set_lower_bounds(-1.0)
         solver.set_upper_bounds(1.0)
-        solver.set_xtol_rel(1e-5)
-        solver.set_param('verbosity', 1)
-        solver.set_maxeval(200)
+        solver.set_xtol_rel(1e-10)
+        solver.set_param('verbosity', 2)
+        solver.set_maxeval(100)
         x = solver.optimize(x0)
         pass
 
